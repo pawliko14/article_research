@@ -13,6 +13,11 @@ public class MachineStructureWithParentProjects {
 
     private Machine_Structure_detail_logic MachineArticles;
     private boolean isItASubproject;
+
+    public String getProject() {
+        return Project;
+    }
+
     private String Project;
     private Connection connection_FAT;
     private String ParentProject;
