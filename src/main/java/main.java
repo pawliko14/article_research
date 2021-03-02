@@ -36,22 +36,35 @@ public class main {
          2. Articles Research  check each article which isnt 'F' for its stock, and orderds
          */
 
-        ArticleAnalyze_2(MachineObj);
+        ArticleAnalyze(MachineObj, 0);
 
+        /*
+         2.1 Article Researchh with base from ArticleAnalyze
+         */
+
+      // ArticleAnalyze_WithPreviousRecord(MachineObj,0, 1 );
 
     }
 
 
-    private static void ArticleAnalyze_2(MachineStructureWithParentProjects machineObj) throws SQLException {
 
+
+    private static void ArticleAnalyze(MachineStructureWithParentProjects machineObj, int temporary_index) throws SQLException {
+
+        System.out.println("*****");
+        System.out.println("ARTICLE ANALYZE");
+        System.out.println("*****");
+        System.out.println("");
 
         System.out.println("MACHINE  : " + machineObj.toString());
 
+        System.out.println(machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).toString());
 
-        machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(0).getCHILDARTICLE();
+
+        machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE();
 
         // step (1). check for the Stock,
-        checkForTheStock( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(0).getCHILDARTICLE());
+        checkForTheStock( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE());
 
         // step(2). based on stock condition( checking in future), now its time to check for storenotesdetail
 //        checkForStorenotesDetail( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(0).getCHILDARTICLE(),
@@ -60,7 +73,7 @@ public class main {
 
         // STEP (2 v2) - bas on stock condtiion, check for bestellingdetail and storenotesdetail simutanuesly;
 
-        checkStorenotesBestellingDetailsArticle( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(0).getCHILDARTICLE(),
+        checkStorenotesBestellingDetailsArticle( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE(),
                 machineObj.getProject()
         );
 
@@ -121,7 +134,7 @@ public class main {
         }
 
 
-        System.out.println("StorenotesBetllingDetails article " + storenoteDetailsBestellingDetails);
+        System.out.println("StorenotesDetail_BestellingDetail article " + storenoteDetailsBestellingDetails);
 
 
         pstmnt.close();
