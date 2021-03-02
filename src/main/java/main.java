@@ -1,6 +1,7 @@
 import DBConnector.DBConnectorFATDB;
 import DBConnector.DBConnectorGtt;
 import Logic.Machine_Structure_detail_logic;
+import Logic.MainLogic;
 import Objetcs.*;
 
 import java.sql.Connection;
@@ -8,19 +9,18 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 
 public class main {
 
-
-    private static Connection connection_fatdb = null;
-    private static Connection connection_gtt = null;
     private static List<Machine_Structure_Detail> Articles_in_Structure;
 
 
-    public static  void main(String[] args) throws SQLException {
+    public static  void main(String[] args) throws Exception {
 
-         connection_fatdb = DBConnectorFATDB.dbConnector();
-         connection_gtt = DBConnectorGtt.dbConnector();
+
+
+       // MainLogic mainFunction = new MainLogic();
 
 
          /*
@@ -29,27 +29,94 @@ public class main {
             assign for the machine (21050204)  its parent or main Project (7/XXXXXXXXX)
           */
         MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("21050204");
-        MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().forEach(System.out::println);
-        System.out.println(MachineObj.toString());
+        MachineObj.GetGeneralProject();
+     //    MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().forEach(System.out::println);
+     //   System.out.println(MachineObj.toString());
 
         /*
          2. Articles Research  check each article which isnt 'F' for its stock, and orderds
          */
 
-        ArticleAnalyze(MachineObj, 0);
+        StorenotesBestellingDetails storenoteBestellingDetail_obj =   ArticleAnalyze(MachineObj, 0);
 
         /*
          2.1 Article Researchh with base from ArticleAnalyze
          */
 
-      // ArticleAnalyze_WithPreviousRecord(MachineObj,0, 1 );
+
+    //    System.out.println("PASSING VALUE :" + storenoteBestellingDetail_obj.toString());
+
+       ArticleAnalyze_WithPreviousRecord(MachineObj, 3, storenoteBestellingDetail_obj);
+
+       System.out.println("\n\n");
+
+
+
+
+    }
+
+    private static void ArticleAnalyze_WithPreviousRecord(MachineStructureWithParentProjects machineObj,int index_binded_toMachineObj, StorenotesBestellingDetails storenoteBestellingDetail_obj_previousOne) throws Exception {
+
+        //1. check if current one parentArticle == previousOne CHildArticle
+
+        String currentParentEqualsPreviousChild = machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(index_binded_toMachineObj).getPARENTARTICLE();
+        int level = machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(index_binded_toMachineObj).getLevel();
+
+
+        // check current one
+        System.out.println(machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(index_binded_toMachineObj).toString());
+
+      //2. search for parent Article
+       boolean IsThereParentArticle =  machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().stream()
+                .filter(x -> x.getCHILDARTICLE().equals(currentParentEqualsPreviousChild))
+                .filter(x -> x.getLevel() == level -1)
+                .findFirst()
+                .isPresent();
+
+            // function below must be implementd, otherwise there is no possibility to track previous article that match following conditions
+            //2.1. get structure details from this article
+               System.out.println("Option that must be implemented" +     machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().stream()
+                    .filter(x -> x.getCHILDARTICLE().equals(currentParentEqualsPreviousChild))
+                    .filter(x -> x.getLevel() == level -1)
+                    .findFirst() );
+
+
+        //3. if 2. return parent article there should be analuze in StorenotesD_BestellingDetails with Parent Article as Afdeling/Afdelingseq
+
+        if(IsThereParentArticle) {
+
+            ArticleAnalyze_2(machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(index_binded_toMachineObj), storenoteBestellingDetail_obj_previousOne);
+        }
+
+        else {
+            System.out.println("there is no parent article for article : " + machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(index_binded_toMachineObj).getCHILDARTICLE());
+        }
+
+
+
+
+
+
+
+    }
+
+    private static void ArticleAnalyze_2(Machine_Structure_Detail machine_structure_detail, StorenotesBestellingDetails storenoteBestellingDetail_obj_previousOne) throws Exception {
+
+        //CODE REUSAGE!!!
+        // step (1). check for the Stock, not used here ( temporary)
+            //    checkForTheStock( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE());
+
+
+
+         System.out.println("second one : ");
+
+        StorenotesBestellingDetails storenotesBestellingDetails = checkStorenotesBestellingDetailsArticle(machine_structure_detail.getCHILDARTICLE(),
+                storenoteBestellingDetail_obj_previousOne.getORDERNUMMER_bestelling());
 
     }
 
 
-
-
-    private static void ArticleAnalyze(MachineStructureWithParentProjects machineObj, int temporary_index) throws SQLException {
+    private static StorenotesBestellingDetails ArticleAnalyze(MachineStructureWithParentProjects machineObj, int temporary_index) throws SQLException {
 
         System.out.println("*****");
         System.out.println("ARTICLE ANALYZE");
@@ -73,14 +140,14 @@ public class main {
 
         // STEP (2 v2) - bas on stock condtiion, check for bestellingdetail and storenotesdetail simutanuesly;
 
-        checkStorenotesBestellingDetailsArticle( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE(),
+         return checkStorenotesBestellingDetailsArticle( machineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(temporary_index).getCHILDARTICLE(),
                 machineObj.getProject()
         );
 
 
     }
 
-    private static void checkStorenotesBestellingDetailsArticle(String childarticle, String ProjectNumber) throws SQLException {
+    private static StorenotesBestellingDetails checkStorenotesBestellingDetailsArticle(String childarticle, String ProjectNumber) throws SQLException {
 
         Connection connection_fatdb =DBConnectorFATDB.dbConnector();
 
@@ -142,6 +209,7 @@ public class main {
         connection_fatdb.close();
 
 
+        return storenoteDetailsBestellingDetails;
     }
 
 

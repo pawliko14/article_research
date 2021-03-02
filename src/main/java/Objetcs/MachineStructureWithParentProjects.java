@@ -33,11 +33,11 @@ public class MachineStructureWithParentProjects {
         MainProject= null;
 
 
-        GetGeneralProject();
+
     }
 
 
-    private void GetGeneralProject() throws SQLException {
+    public void GetGeneralProject() throws SQLException {
 
         if(DetermineIfProjectHasAnyParent())
         {

@@ -1,5 +1,7 @@
 package Objetcs;
 
+import java.util.Objects;
+
 public class Machine_Structure_Detail {
 
     private String ID;
@@ -89,5 +91,24 @@ public class Machine_Structure_Detail {
                 ", type='" + type + '\'' +
                 ", level=" + level +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Machine_Structure_Detail that = (Machine_Structure_Detail) o;
+        return level == that.level &&
+                Objects.equals(ID, that.ID) &&
+                Objects.equals(MACHINEMUBER, that.MACHINEMUBER) &&
+                Objects.equals(PARENTARTICLE, that.PARENTARTICLE) &&
+                Objects.equals(CHILDARTICLE, that.CHILDARTICLE) &&
+                Objects.equals(Quantity, that.Quantity) &&
+                Objects.equals(type, that.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(ID, MACHINEMUBER, PARENTARTICLE, CHILDARTICLE, Quantity, type, level);
     }
 }
