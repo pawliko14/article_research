@@ -16,16 +16,20 @@ public class Machine_Structure_detail_logic {
     private String Machine_Number;
     private Connection connection_gtt;
 
-    public Machine_Structure_detail_logic( String machine_Number) {
+    public Machine_Structure_detail_logic( String machine_Number) throws SQLException {
         Articles_in_Structure = new ArrayList<Machine_Structure_Detail>();
         Machine_Number = machine_Number;
         connection_gtt = DBConnectorGtt.dbConnector();
 
+        getArticlesFromMachine();
     }
+
+
+
 
     public List<Machine_Structure_Detail> GetArticlesFromMachine () throws SQLException {
 
-         getArticlesFromMachine();
+
          return Remove_F_Articles_from_list();
     }
 
