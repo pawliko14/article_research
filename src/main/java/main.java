@@ -14,6 +14,8 @@ public class main {
 
     private static List<Machine_Structure_Detail> Articles_in_Structure;
 
+    private static final String MachineNum  = "20052102";
+
 
     public static  void main(String[] args) throws Exception {
 
@@ -74,7 +76,7 @@ public class main {
             assign for the machine (21050204)  its parent or main Project (7/XXXXXXXXX)
           */
         //    MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("21050204");
-        MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("20052101");  // sprawdzanie podprojektu
+        MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects(MachineNum);
         MachineObj.GetGeneralProject();
         String BestelDatum =  checkForBesteldatumFromBestelling(MachineObj.getProject());  //
 
@@ -87,15 +89,22 @@ public class main {
 
 
 
-
+        // here lies main problem, it highly depends on is it subproject or general project
 
         List<StorenoteBestellingdetails_Stock> storenoteBestellingdetails_stocks= new ArrayList<>();
-        for(int i = 0 ; i < size; i++) {
 
-            List<StorenoteBestellingdetails_Stock> el = StorenotesBestellingStock(
-                    MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(i), BestelDatum);
-            storenoteBestellingdetails_stocks.addAll(el);
-        }
+        // probably wrong, dont use it!
+//        for(int i = 0 ; i < size; i++) {
+//
+//            List<StorenoteBestellingdetails_Stock> el = StorenotesBestellingStock(
+//                    MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(i), BestelDatum);
+//            storenoteBestellingdetails_stocks.addAll(el);
+//        }
+
+
+        List<StorenoteBestellingdetails_Stock> el = StorenotesBestellingStock_v2(MachineNum);
+        storenoteBestellingdetails_stocks.addAll(el);
+
 
 
         storenoteBestellingdetails_stocks.forEach(System.out::println);
@@ -154,6 +163,216 @@ public class main {
 
     }
 
+    private static List<StorenoteBestellingdetails_Stock> StorenotesBestellingStock_v2(String MachineNumber) throws SQLException {
+
+
+        List<StorenoteBestellingdetails_Stock> listOfElements = new ArrayList<>();
+
+        Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+
+        String sql_GetArticles = "select \n" +
+                "  s.Leverancier as Leverancier_storenotes\n" +
+                ", s.ORDERNUMMER  as ORDERNUMMER_storenotes\n" +
+                ", s.ARTIKELCODE  as ARTIKELCODE_storenotes\n" +
+                ", s.ARTIKELOMSCHRIJVING as ARTIKELOMSCHRIJVING_storenotes\n" +
+                ", s.BESTELD as BESTELD_storenotes\n" +
+                ", s.GELEVERD  as GELEVERD_storenotes\n" +
+                ", s.CFSTOCK as CFSTOCK_storenotes\n" +
+                ", s.AFDELING as AFDELING_storenotes\n" +
+                ", s.AFDELINGSEQ as AFDELINGSEQ_storenotes\n" +
+                ", s.MONTAGE as MONTAGE_storenotes\n" +
+                ", s.BESTELDATUM as BESTELDATUM_storentoes\n" +
+                ", b2.leverancier as leverancier_bestelling\n" +
+                ", b2.ORDERNUMMER  as ORDERNUMMER_bestelling\n" +
+                ", b2.BESTELDATUM  as BESTELDATUM_bestelling\n" +
+                ", b2.AFDELINGSEQ  as afdelingseq_bestelling\n" +
+                ", st.Ilosc  as ilosc_stock\n" +
+                ", st.naProdukcji  as naProdukcji_stock\n" +
+                ", st.Zapotrzebowanie  as Zapotrzebowanie_stock\n" +
+                "from storenotesdetail s \n" +
+                "left join bestellingdetail b2 \n" +
+                "\ton s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "\tand s.BESTELDATUM  = b2.BESTELDATUM \n" +
+                "left join stock st\n" +
+                "            on s.ARTIKELCODE  = st.kodArtykulu \n" +
+                "                where s.STATUSCODE  = 'O'\n" +
+                "                and s.AFDELINGSEQ  = ? \n" +
+                "                and s.BESTELD  <> s.GELEVERD \n" +
+                "                order by b2.BESTELDATUM  \n" +
+                "                desc";
+
+
+
+
+
+
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql_GetArticles);
+        pstmnt.setString(1,MachineNumber);
+
+
+        ResultSet rs=pstmnt.executeQuery();
+
+        getRowcCOunt(rs);
+
+        StorenoteBestellingdetails_Stock art = null;
+        while(rs.next())
+        {
+            art = new StorenoteBestellingdetails_Stock(
+                    rs.getString("Leverancier_storenotes"),
+                    rs.getString("ORDERNUMMER_storenotes"),
+                    rs.getString("ARTIKELCODE_storenotes"),
+                    rs.getString("ARTIKELOMSCHRIJVING_storenotes"),
+                    rs.getString("BESTELD_storenotes"),
+                    rs.getString("GELEVERD_storenotes"),
+                    rs.getString("CFSTOCK_storenotes"),
+                    rs.getString("AFDELING_storenotes"),
+                    rs.getString("AFDELINGSEQ_storenotes"),
+                    rs.getString("MONTAGE_storenotes"),
+                    rs.getString("BESTELDATUM_storentoes"),
+                    rs.getString("leverancier_bestelling"),
+                    rs.getString("ORDERNUMMER_bestelling"),
+                    rs.getString("BESTELDATUM_bestelling"),
+                    rs.getString("afdelingseq_bestelling"),
+                    rs.getString("ilosc_stock"),
+                    rs.getString("naProdukcji_stock"),
+                    rs.getString("Zapotrzebowanie_stock")
+            );
+
+            // check for article stock values
+
+            filterOverBestellingDetailOnceAgain(art.getARTIKELCODE_storenotes(), connection_fatdb);
+
+
+          String result =  checkIfStockHasEnoughMaterial(art.getARTIKELCODE_storenotes(), connection_fatdb);
+
+          if(result.equals("lager")) {
+              art.setLeverancier_bestelling("lager");
+              art.setORDERNUMMER_bestelling("lager");
+          }
+
+            if(art.getAfdelingseq_bestelling() == null) {
+
+                // probably nested 500/ testing
+                if(art.getARTIKELCODE_storenotes().equals("211-010-2300/010"))
+                {
+                    int x = 0;
+                }
+
+               String feteched500 =  find500basedOnArticleCode(art.getARTIKELCODE_storenotes(), connection_fatdb);
+                if(feteched500 !=null) {
+                    String[] fetched_divided = feteched500.split("/");
+
+                    art.setAfdelingseq_bestelling(feteched500);
+
+                    art.setLeverancier_bestelling(fetched_divided[0]);
+                    art.setORDERNUMMER_bestelling(fetched_divided[1]);
+                }
+
+            }
+
+            listOfElements.add(art);
+        }
+
+
+
+        pstmnt.close();
+        rs.close();
+        connection_fatdb.close();
+
+
+        return listOfElements;
+    }
+
+    private static String filterOverBestellingDetailOnceAgain(String artikelcode_storenotes, Connection connection_fatdb) throws SQLException {
+
+        String sql  = " select Zapotrzebowanie ,Ilosc  from stock s  where kodArtykulu  = ? ";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql);
+        pstmnt.setString(1,artikelcode_storenotes);
+
+
+        int needed = 0;
+        int stock_quantity = 0;
+
+        ResultSet rs=pstmnt.executeQuery();
+
+        while(rs.next()) {
+
+            needed = rs.getInt("Zapotrzebowanie");
+            stock_quantity = rs.getInt("Ilosc");
+
+        }
+
+
+
+        pstmnt.close();
+        rs.close();
+
+
+        return needed <= stock_quantity ? "lager" : "";
+
+    }
+
+    private static String checkIfStockHasEnoughMaterial(String artikelcode_storenotes, Connection connection_fatdb) throws SQLException {
+
+
+        String sql  = " select Zapotrzebowanie ,Ilosc  from stock s  where kodArtykulu  = ? ";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql);
+        pstmnt.setString(1,artikelcode_storenotes);
+
+
+        int needed = 0;
+        int stock_quantity = 0;
+
+        ResultSet rs=pstmnt.executeQuery();
+
+        while(rs.next()) {
+
+            needed = rs.getInt("Zapotrzebowanie");
+            stock_quantity = rs.getInt("Ilosc");
+
+        }
+
+
+
+        pstmnt.close();
+        rs.close();
+
+
+        return needed <= stock_quantity ? "lager" : "";
+
+
+    }
+
+    private static String find500basedOnArticleCode(String artikelcode_storenotes, Connection connection_fatdb) throws SQLException {
+
+        String result500 = null;
+
+        String sql  = "   select concat(leverancier , '/', ORDERNUMMER ) as result from bestellingdetail b2b \n" +
+                "                where ARTIKELCODE  = ? \n" +
+                "                and GELEVERD  <> BESTELD ";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql);
+        pstmnt.setString(1,artikelcode_storenotes);
+
+
+        ResultSet rs=pstmnt.executeQuery();
+
+        while(rs.next()) {
+
+            result500 = rs.getString("result");
+
+        }
+
+        pstmnt.close();
+        rs.close();
+
+        return result500;
+    }
+
     private static List<StorenoteBestellingdetails_Stock> StorenotesBestellingStock(Machine_Structure_Detail machine_structure_detail, String bestelDatum) throws SQLException {
 
         int rowsCount  = checkIfSqlHasMoreThan1RowAsResult(machine_structure_detail.getCHILDARTICLE(), bestelDatum);
@@ -161,6 +380,10 @@ public class main {
         List<StorenoteBestellingdetails_Stock> listOfElements = new ArrayList<>();
 
         Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+        String afdelingAsProjectNUmber = machine_structure_detail.getMACHINEMUBER();
+
+        /*  in case if it  is subproject there should be afdelingseq from storenotes pointing to project number */
 
         String sql_GetArticles = "select \n" +
                 "  s.Leverancier as Leverancier_storenotes\n" +
@@ -189,6 +412,7 @@ public class main {
                 "on s.ARTIKELCODE  = st.kodArtykulu \n" +
                 "Where s.ARTIKELCODE  = ? \n" +
                 "and s.BESTELDATUM  = ? \n" +
+                "and s.AFDELINGSEQ   = "+afdelingAsProjectNUmber+" \n" +
                 "order by b2.BESTELDATUM  \n" +
                 "desc ";
 
@@ -280,50 +504,6 @@ public class main {
     }
 
     private static void getRowcCOunt(ResultSet resultSet) {
-
-
-
-    }
-
-    private static void WrongALgorithm_leaveit(MachineStructureWithParentProjects machineObj, int size) throws SQLException {
-
-
-        //   LeverancierOrderNUmmer(MachineObj,size);
-        List<LeverancierOrdernummer> leverancierOrdernummers = LeverancierOrderNUmberWIthoutNUlls(machineObj, size);
-
-        // foreach of the obkject find Bestled gElerved Bostdeh and CFStock
-        for(LeverancierOrdernummer l : leverancierOrdernummers)
-            FindArticleStock(l);
-
-        leverancierOrdernummers.forEach(System.out::println);
-
-        // find articles that BESTELD <> GELERVED
-
-//        System.out.println("removed from lise articles where Besteld = Gelerved");
-//        leverancierOrdernummers.stream()
-//                    .filter(x-> !x.getBesteld().equals(x.getGelerved()))
-//                    .collect(Collectors.toList()).forEach(System.out::println);
-
-
-
-
-
-        /*
-         2. Articles Research  check each article which isnt 'F' for its stock, and orderds
-         */
-
-        //   StorenotesBestellingDetails storenoteBestellingDetail_obj =   ArticleAnalyze(MachineObj, 0);
-
-        /*
-         2.1 Article Researchh with base from ArticleAnalyze
-         */
-
-
-        //    System.out.println("PASSING VALUE :" + storenoteBestellingDetail_obj.toString());
-
-        //  ArticleAnalyze_WithPreviousRecord(MachineObj, 3, storenoteBestellingDetail_obj);
-
-        System.out.println("\n\n");
 
 
 
@@ -786,42 +966,6 @@ public class main {
 
     }
 
-
-    private static void ArticleAnalyze(Machine_Structure_Detail s) {
-
-    //    System.out.println(s.toString());
-
-        //1. check article type
-        switch (s.getType() ){
-            case "P" :
-
-                /*
-                 1. IF its 'P' type, there always should be production note which starts with '500/   retrive information from bestellingdetails and storenotesdetail\
-                 2. IF this is Article 'P' type, it is 99% possible that inside this article hides another ( piramid scheme)
-
-                 How to check how deep this article is??
-                 */
-
-                break;
-
-            case "Y" :
-
-                break;
-
-            case "A" :
-
-                break;
-
-            default:
-
-                System.err.println("there is no P || Y ||A article!");
-
-                break;
-        }
-
-
-
-    }
 
 
 }
