@@ -1,11 +1,11 @@
 package Excel;
 
 import Objetcs.StorenoteBestellingdetails_Stock;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -13,7 +13,7 @@ import java.util.List;
 
 public class ExcelFIle {
 
-    private static String[] columns = {"MatSource", "Itemm no.", "Desc", "Consumer", "Quantity", "Consumer"};
+    private static String[] columns = {"Order-No", "Description","MatSource", "Itemm no.", "Desc", "Consumer", "Quantity", "Consumer"};
 
 
     public void ExcelFIle(){};
@@ -62,24 +62,30 @@ public class ExcelFIle {
             Row row = sheet.createRow(rowNum++);
 
             row.createCell(0)
-                    .setCellValue(obj.getLeverancier_bestelling() + "/" + obj.getORDERNUMMER_bestelling());
+                    .setCellValue("Machine_num");
 
             row.createCell(1)
-                    .setCellValue(obj.getARTIKELCODE_storenotes());
+                    .setCellValue("Machine_desc");
 
             row.createCell(2)
+                    .setCellValue(obj.getLeverancier_bestelling() + "/" + obj.getORDERNUMMER_bestelling());
+
+            row.createCell(3)
+                    .setCellValue(obj.getARTIKELCODE_storenotes());
+
+            row.createCell(4)
                     .setCellValue(obj.getARTIKELOMSCHRIJVING_storenotes());
 
 
-            row.createCell(3)
+            row.createCell(5)
                     .setCellValue(obj.getAFDELING_storenotes() + "/" + obj.getAFDELINGSEQ_storenotes());
 
 
-            row.createCell(4)
+            row.createCell(6)
                     .setCellValue(obj.getBESTELD_storenotes());
 
 
-            row.createCell(5)
+            row.createCell(7)
                     .setCellValue(obj.getLeverancier_storenotes() + "/" + obj.getORDERNUMMER_storenotes());
         }
 
@@ -88,13 +94,29 @@ public class ExcelFIle {
             sheet.autoSizeColumn(i);
         }
 
-        // Write the output to a file
-        FileOutputStream fileOut = new FileOutputStream("poi-generated-file.xlsx");
+
+        createFile(workbook);
+
+        workbook.close();
+    }
+
+    private void createFile(Workbook workbook) throws IOException {
+
+        File f = new File("poi-generated-file.xlsx");
+
+        if(!f.exists()) {
+            f.createNewFile();
+        }else {
+            f = new File("poi-generated-file1.xlsx");
+            f.createNewFile();
+        }
+
+        FileOutputStream fileOut = new FileOutputStream(f);
+
+
+
         workbook.write(fileOut);
         fileOut.close();
-
-        // Closing the workbook
-        workbook.close();
     }
 
 }

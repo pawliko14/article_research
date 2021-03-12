@@ -3,14 +3,12 @@ import Excel.ExcelFIle;
 import LeverancierOrdernummer.LeverancierOrdernummer;
 import Objetcs.*;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.*;
 
 public class main {
 
@@ -21,7 +19,53 @@ public class main {
 
 
 
-       // MainLogic mainFunction = new MainLogic();
+            /*
+         1. step get data from gtt database for example : 21050204
+            create an Object with articles from Strucutre(Gtt_database)
+            assign for the machine (21050204)  its parent or main Project (7/XXXXXXXXX)
+          */
+        //    MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("21050204");
+
+
+      // OLD LOGIC, faulty
+        OLD_LOGIC_WRONG_ONE();
+
+
+
+
+
+    }
+
+
+
+    private static String checkForLeverDatumFromBestellig(String project) throws SQLException {
+        Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+        String sql_GetArticles = "select LEVERDATUM, ORDERNUMMER from bestelling b2s \n" +
+                "where ORDERNUMMER  = ? ";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql_GetArticles);
+        pstmnt.setString(1,project);
+
+        ResultSet rs=pstmnt.executeQuery();
+        String Besteldatum = null;
+
+        if(rs.next() == true)
+        {
+            Besteldatum = rs.getString("BESTELDATUM");
+        }
+
+
+        pstmnt.close();
+        rs.close();
+        connection_fatdb.close();
+
+        return Besteldatum;
+    }
+
+    private static void OLD_LOGIC_WRONG_ONE() throws IOException, SQLException {
+
+        // MainLogic mainFunction = new MainLogic();
 
 
          /*
@@ -29,23 +73,30 @@ public class main {
             create an Object with articles from Strucutre(Gtt_database)
             assign for the machine (21050204)  its parent or main Project (7/XXXXXXXXX)
           */
-        MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("21050204");
+        //    MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("21050204");
+        MachineStructureWithParentProjects MachineObj = new MachineStructureWithParentProjects("20052101");  // sprawdzanie podprojektu
         MachineObj.GetGeneralProject();
-        String BestelDatum =  checkForBesteldatumFromBestelling(MachineObj.getProject());  // 21050204
+        String BestelDatum =  checkForBesteldatumFromBestelling(MachineObj.getProject());  //
 
 
         System.out.println("Stuctura: ");
 
-       MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().forEach(System.out::println);
-
+        MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().forEach(System.out::println);
         int size = MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().size();
+
+
+
+
+
 
         List<StorenoteBestellingdetails_Stock> storenoteBestellingdetails_stocks= new ArrayList<>();
         for(int i = 0 ; i < size; i++) {
 
-            storenoteBestellingdetails_stocks.add (   StorenotesBestellingStock(MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(i),
-                    BestelDatum));
+            List<StorenoteBestellingdetails_Stock> el = StorenotesBestellingStock(
+                    MachineObj.getMachineArtilcesLogic().GetArticlesFromMachine().get(i), BestelDatum);
+            storenoteBestellingdetails_stocks.addAll(el);
         }
+
 
         storenoteBestellingdetails_stocks.forEach(System.out::println);
 
@@ -59,26 +110,38 @@ public class main {
 
         // eliminate where besteld = gelerved
 
-        storenoteBestellingdetails_stocks.removeIf(x-> x.getBESTELD_storenotes().equals(x.getGELEVERD_storenotes()));
+        storenoteBestellingdetails_stocks
+                .removeIf(x-> x.getBESTELD_storenotes().equals(x.getGELEVERD_storenotes())
+                        && (!x.getBESTELD_storenotes().equals("0") && !x.getGELEVERD_storenotes().equals("0")));
 
         // filter nulls in bestelling - probably Lagers
-
-       // storenoteBestellingdetails_stocks.stream()
-          //      .map(  y->  { y.setORDERNUMMER_bestelling("LAGER"); return y;});
-
-
-        for( int i = 0 ; i < storenoteBestellingdetails_stocks.size(); i++)
-        {
-            if(storenoteBestellingdetails_stocks.get(i).getORDERNUMMER_bestelling() == null){
-               String ORDERNUMMER_bestelling = "Lager";
-               storenoteBestellingdetails_stocks.get(i).setORDERNUMMER_bestelling(ORDERNUMMER_bestelling);
-            }
-        }
+//        for( int i = 0 ; i < storenoteBestellingdetails_stocks.size(); i++)
+//        {
+//            if(storenoteBestellingdetails_stocks.get(i).getORDERNUMMER_bestelling() == null){
+//               String ORDERNUMMER_bestelling = "Lager";
+//               storenoteBestellingdetails_stocks.get(i).setORDERNUMMER_bestelling(ORDERNUMMER_bestelling);
+//            }
+//        }
 
 
+        // filter to find FEHLER, if stock value < neededValue then it should return Fehler(there should be more condition)
+//        storenoteBestellingdetails_stocks.stream()
+//                .filter(x->Double.parseDouble(x.getIlosc_stock())  < Double.parseDouble(x.getZapotrzebowanie_stock()))
+//                .peek(x->x.setORDERNUMMER_bestelling("FEHLER"))
+//                .collect(Collectors.toList());
 
-            // changed lagers
-       // storenoteBestellingdetails_stocks.forEach((System.out::println));
+        // filter to find Lagers, not all conditions
+//        storenoteBestellingdetails_stocks.stream()
+//                .filter(x->Double.parseDouble(x.getIlosc_stock())  > Double.parseDouble(x.getZapotrzebowanie_stock()))
+//                .peek(x->x.setORDERNUMMER_bestelling("LAGER"))
+//                .peek(x->x.setLeverancier_bestelling("LAGER"))
+//                .collect(Collectors.toList());
+
+
+
+
+        // changed lagers
+        // storenoteBestellingdetails_stocks.forEach((System.out::println));
 
         // CReate an Excel file
         ExcelFIle file = new ExcelFIle();
@@ -89,12 +152,13 @@ public class main {
         storenoteBestellingdetails_stocks.forEach(System.out::println);
 
 
-
-
-
     }
 
-    private static StorenoteBestellingdetails_Stock StorenotesBestellingStock(Machine_Structure_Detail machine_structure_detail, String bestelDatum) throws SQLException {
+    private static List<StorenoteBestellingdetails_Stock> StorenotesBestellingStock(Machine_Structure_Detail machine_structure_detail, String bestelDatum) throws SQLException {
+
+        int rowsCount  = checkIfSqlHasMoreThan1RowAsResult(machine_structure_detail.getCHILDARTICLE(), bestelDatum);
+
+        List<StorenoteBestellingdetails_Stock> listOfElements = new ArrayList<>();
 
         Connection connection_fatdb =DBConnectorFATDB.dbConnector();
 
@@ -114,18 +178,25 @@ public class main {
                 ", b2.ORDERNUMMER  as ORDERNUMMER_bestelling\n" +
                 ", b2.BESTELDATUM  as BESTELDATUM_bestelling\n" +
                 ", b2.AFDELINGSEQ  as afdelingseq_bestelling\n" +
-                ", st.Ilosc as Ilosc \n" +
-                ", st.naProdukcji as naProdukcji \n" +
-                ", st.Zapotrzebowanie as Zapotrzenowanie\n" +
+                ", st.Ilosc  as ilosc_stock\n" +
+                ", st.naProdukcji  as naProdukcji_stock\n" +
+                ", st.Zapotrzebowanie  as Zapotrzebowanie_stock\n" +
                 "from storenotesdetail s \n" +
                 "left join bestellingdetail b2 \n" +
-                "on s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "\ton s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "\tand s.BESTELDATUM  = b2.BESTELDATUM \n" +
                 "left join stock st\n" +
                 "on s.ARTIKELCODE  = st.kodArtykulu \n" +
                 "Where s.ARTIKELCODE  = ? \n" +
-                "and s.BESTELDATUM  =  ? \n" +
-                "order by b2.BESTELDATUM  desc \n" +
-                "limit 1";
+                "and s.BESTELDATUM  = ? \n" +
+                "order by b2.BESTELDATUM  \n" +
+                "desc ";
+
+
+
+
+
+
 
         PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql_GetArticles);
         pstmnt.setString(1,machine_structure_detail.getCHILDARTICLE());
@@ -133,6 +204,8 @@ public class main {
 
 
         ResultSet rs=pstmnt.executeQuery();
+        
+        getRowcCOunt(rs);
 
         StorenoteBestellingdetails_Stock art = null;
         while(rs.next())
@@ -153,10 +226,12 @@ public class main {
                     rs.getString("ORDERNUMMER_bestelling"),
                     rs.getString("BESTELDATUM_bestelling"),
                     rs.getString("afdelingseq_bestelling"),
-                    rs.getString("Ilosc"),
-                    rs.getString("naProdukcji"),
-                    rs.getString("Zapotrzenowanie")
+                    rs.getString("ilosc_stock"),
+                    rs.getString("naProdukcji_stock"),
+                    rs.getString("Zapotrzebowanie_stock")
                     );
+
+            listOfElements.add(art);
         }
 
 
@@ -166,7 +241,48 @@ public class main {
         connection_fatdb.close();
 
 
-    return art;
+    return listOfElements;
+    }
+
+    private static int checkIfSqlHasMoreThan1RowAsResult(String childarticle, String bestelDatum) throws SQLException {
+
+        int count_resultSet = 0;
+        Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+        String checker = "select \n" +
+                "count(*) as count\n" +
+                "from storenotesdetail s \n" +
+                "left join bestellingdetail b2 \n" +
+                "\ton s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "\tand s.BESTELDATUM  = b2.BESTELDATUM \n" +
+                "left join stock st\n" +
+                "on s.ARTIKELCODE  = st.kodArtykulu \n" +
+                "Where s.ARTIKELCODE  = ? \n" +
+                "and s.BESTELDATUM  = ? ";
+
+        PreparedStatement pstmn_checker = connection_fatdb.prepareStatement(checker);
+        pstmn_checker.setString(1,childarticle);
+        pstmn_checker.setString(2,bestelDatum);
+
+
+        ResultSet rs=pstmn_checker.executeQuery();
+        if(rs.first())
+        {
+            count_resultSet= rs.getInt("count");
+        }
+
+        pstmn_checker.close();
+        rs.close();
+        connection_fatdb.close();
+
+
+        return count_resultSet;
+    }
+
+    private static void getRowcCOunt(ResultSet resultSet) {
+
+
+
     }
 
     private static void WrongALgorithm_leaveit(MachineStructureWithParentProjects machineObj, int size) throws SQLException {
@@ -419,10 +535,6 @@ public class main {
         {
              Besteldatum = rs.getString("BESTELDATUM");
         }
-
-
-        System.out.println("Besteldatum for article "+s +" -> " + Besteldatum);
-
 
         pstmnt.close();
         rs.close();

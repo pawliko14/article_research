@@ -43,11 +43,27 @@ public class Machine_Structure_detail_logic {
     }
 
 
-
+    /**
+     *
+     * CAREFULL!!!
+     * function has been changed, group by clausle has been added,
+     * previously this statement returned all data for specific machine
+     * now it return no duplicated rows based on 'CHILDARTICLE'
+     *
+     * 09.03.2021
+     *
+     * @return
+     * @throws SQLException
+     */
     private List<Machine_Structure_Detail> getArticlesFromMachine() throws SQLException {
 
-        String sql_GetArticles = "select ID,MACHINENUMBER , PARENTARTICLE , CHILDARTICLE ,QUANTITY , `TYPE` ,`LEVEL` \n" +
-                "from machine_structure_details msd  where MACHINENUMBER  = ? ";
+//         previous sql, without group by
+//        String sql_GetArticles = "select ID,MACHINENUMBER , PARENTARTICLE , CHILDARTICLE ,QUANTITY , `TYPE` ,`LEVEL` \n" +
+//                "from machine_structure_details msd  where MACHINENUMBER  = ? ";
+
+        String sql_GetArticles = "select  ID,MACHINENUMBER ,PARENTARTICLE ,  CHILDARTICLE  ,QUANTITY ,`TYPE` , `LEVEL`  from machine_structure_details msd \n" +
+                "where MACHINENUMBER  =  ? \n" +
+                "GROUP BY CHILDARTICLE \n";
 
         PreparedStatement pstmnt = connection_gtt.prepareStatement(sql_GetArticles);
         pstmnt.setString(1,Machine_Number);
