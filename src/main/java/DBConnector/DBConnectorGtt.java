@@ -13,8 +13,6 @@ public class DBConnectorGtt {
             String pass = "gttpassword";
             String base = "gttdatabase";
 
-            System.out.println(user);
-            System.out.println(pass);
             Class.forName("org.mariadb.jdbc.Driver");
             Connection conn = DriverManager.getConnection("jdbc:mariadb://" + adresSerwera + "/" + base, user, pass);
             return conn;

@@ -13,8 +13,6 @@ public class DBConnectorFATDB {
             String pass = "1234";
             String base = "fatdb";
 
-            System.out.println(user);
-            System.out.println(pass);
             Class.forName("org.mariadb.jdbc.Driver");
             Connection conn = DriverManager.getConnection("jdbc:mariadb://" + adresSerwera + "/" + base, user, pass);
             return conn;

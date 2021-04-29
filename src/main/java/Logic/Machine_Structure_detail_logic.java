@@ -16,16 +16,20 @@ public class Machine_Structure_detail_logic {
     private String Machine_Number;
     private Connection connection_gtt;
 
-    public Machine_Structure_detail_logic( String machine_Number) {
+    public Machine_Structure_detail_logic( String machine_Number) throws SQLException {
         Articles_in_Structure = new ArrayList<Machine_Structure_Detail>();
         Machine_Number = machine_Number;
         connection_gtt = DBConnectorGtt.dbConnector();
 
+        getArticlesFromMachine();
     }
+
+
+
 
     public List<Machine_Structure_Detail> GetArticlesFromMachine () throws SQLException {
 
-         getArticlesFromMachine();
+
          return Remove_F_Articles_from_list();
     }
 
@@ -39,11 +43,27 @@ public class Machine_Structure_detail_logic {
     }
 
 
-
+    /**
+     *
+     * CAREFULL!!!
+     * function has been changed, group by clausle has been added,
+     * previously this statement returned all data for specific machine
+     * now it return no duplicated rows based on 'CHILDARTICLE'
+     *
+     * 09.03.2021
+     *
+     * @return
+     * @throws SQLException
+     */
     private List<Machine_Structure_Detail> getArticlesFromMachine() throws SQLException {
 
-        String sql_GetArticles = "select ID,MACHINENUMBER , PARENTARTICLE , CHILDARTICLE ,QUANTITY , `TYPE` ,`LEVEL` \n" +
-                "from machine_structure_details msd  where MACHINENUMBER  = ? ";
+//         previous sql, without group by
+//        String sql_GetArticles = "select ID,MACHINENUMBER , PARENTARTICLE , CHILDARTICLE ,QUANTITY , `TYPE` ,`LEVEL` \n" +
+//                "from machine_structure_details msd  where MACHINENUMBER  = ? ";
+
+        String sql_GetArticles = "select  ID,MACHINENUMBER ,PARENTARTICLE ,  CHILDARTICLE  ,QUANTITY ,`TYPE` , `LEVEL`  from machine_structure_details msd \n" +
+                "where MACHINENUMBER  =  ? \n" +
+                "GROUP BY CHILDARTICLE \n";
 
         PreparedStatement pstmnt = connection_gtt.prepareStatement(sql_GetArticles);
         pstmnt.setString(1,Machine_Number);
