@@ -1,7 +1,9 @@
 import DBConnector.DBConnectorFATDB;
+import DBConnector.DBConnectorGtt;
 import Excel.ExcelFIle;
 import LeverancierOrdernummer.LeverancierOrdernummer;
 import Objetcs.*;
+
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -14,7 +16,7 @@ public class main {
 
     private static List<Machine_Structure_Detail> Articles_in_Structure;
 
-    private static final String MachineNum  = "20052102";
+    private static final String MachineNum  = "20053608";  //20052102  , 20052102
 
 
     public static  void main(String[] args) throws Exception {
@@ -30,14 +32,96 @@ public class main {
 
 
       // OLD LOGIC, faulty
-        OLD_LOGIC_WRONG_ONE();
+       OLD_LOGIC_WRONG_ONE();
 
 
-
-
+        // following function only for testing purpose - to remove
+        // 21000301
+//     List<String > data =   findcompletePartsOverviewData();
+//
+//     data.stream().forEach(x -> {
+//            try {
+//                finddates(x);
+//            } catch (SQLException throwables) {
+//                throwables.printStackTrace();
+//            }
+//        });
 
     }
 
+    private static void finddates(String l) throws SQLException {
+        Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+
+        String sql_GetArticles = "select ORDERNUMMER,BESTELDATUM ,LEVERDATUM \n" +
+                "from storenotesdetail s where Leverancier  = 103\n" +
+                "and ORDERNUMMER  = '"+l+"'\n" +
+                "and ARTIKELCODE  = 'NVK612'";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql_GetArticles);
+
+        ResultSet rs=pstmnt.executeQuery();
+        String Besteldatum = null;
+
+        while(rs.next())
+        {
+
+            String ordernummer =  rs.getString("ordernummer");
+            String BESTELDATUM =  rs.getString("BESTELDATUM");
+            String LEVERDATUM =  rs.getString("LEVERDATUM");
+
+            System.out.println("Ordernummer -> " + ordernummer);
+            System.out.println("BESTELDATUM -> " + BESTELDATUM);
+            System.out.println("LEVERDATUM -> " + LEVERDATUM);
+            System.out.println(" ");
+
+        }
+
+
+        pstmnt.close();
+        rs.close();
+        connection_fatdb.close();
+
+
+
+
+
+
+
+
+        connection_fatdb.close();
+    }
+
+    private static List<String> findcompletePartsOverviewData() throws SQLException {
+
+        List<String> ordernummers = new ArrayList<>();
+
+        Connection connection_fatdb =DBConnectorFATDB.dbConnector();
+
+        String sql_GetArticles = "select substring(Storenote, 5, length(Storenote)) as ordernummer  \n" +
+                "from partsoverview p \n" +
+                "where ItemNo  = 'NVK612'\n" +
+                "order by MatSource \n";
+
+        PreparedStatement pstmnt = connection_fatdb.prepareStatement(sql_GetArticles);
+
+        ResultSet rs=pstmnt.executeQuery();
+        String Besteldatum = null;
+
+        while(rs.next())
+        {
+            ordernummers.add( rs.getString("ordernummer"));
+        }
+
+
+        pstmnt.close();
+        rs.close();
+        connection_fatdb.close();
+
+
+
+        return ordernummers;
+    }
 
 
     private static String checkForLeverDatumFromBestellig(String project) throws SQLException {
@@ -214,7 +298,6 @@ public class main {
 
         ResultSet rs=pstmnt.executeQuery();
 
-        getRowcCOunt(rs);
 
         StorenoteBestellingdetails_Stock art = null;
         while(rs.next())
@@ -245,7 +328,48 @@ public class main {
             filterOverBestellingDetailOnceAgain(art.getARTIKELCODE_storenotes(), connection_fatdb);
 
 
+
+
+            // debug
+            if( art.getARTIKELCODE_storenotes().equals("NCKP512"))
+            {
+                int debug_here = 0;
+            }
+
+
+
+            /*
+            checking if articles leverancier/ordenummer from bestelling is like /500
+            in this case there probably should be inner article, which must be processed
+
+            check for it form gtt_database
+             */
+            Map<String,String> MapOfpotentialCHildArticles;
+            if(art.getLeverancier_bestelling() != null) {
+                if (art.getLeverancier_bestelling().equals("500")) {
+
+                    MapOfpotentialCHildArticles = checkForChildArticleFromGttDatabase(art.getLeverancier_bestelling(), art.getORDERNUMMER_bestelling(), art.getARTIKELCODE_storenotes(), MachineNumber);
+
+
+                    if (!MapOfpotentialCHildArticles.isEmpty()) {
+
+                    /*
+                    if map is not empty, it means that there are potential list of childArticles that must be processed
+                     */
+                        for (Map.Entry<String, String> entry : MapOfpotentialCHildArticles.entrySet()) {
+                            StorenoteBestellingdetails_Stock innerObject = processListOfChildArticles(art.getLeverancier_bestelling(), art.getORDERNUMMER_bestelling(), art.getARTIKELCODE_storenotes(), entry.getKey());
+
+                            if (innerObject != null)
+                                listOfElements.add(innerObject);
+                        }
+
+                    }
+                }
+            }
+
           String result =  checkIfStockHasEnoughMaterial(art.getARTIKELCODE_storenotes(), connection_fatdb);
+
+
 
           if(result.equals("lager")) {
               art.setLeverancier_bestelling("lager");
@@ -272,7 +396,14 @@ public class main {
 
             }
 
-            listOfElements.add(art);
+
+        //   if( articleBesteldIsDifferentThanGelerved(art, MachineNumber)) {
+               listOfElements.add(art);
+          // }
+
+
+            System.out.println("added : " + art.getARTIKELCODE_storenotes());
+
         }
 
 
@@ -282,7 +413,172 @@ public class main {
         connection_fatdb.close();
 
 
+
+
+
         return listOfElements;
+    }
+
+    private static boolean articleBesteldIsDifferentThanGelerved(StorenoteBestellingdetails_Stock art, String MachineNumber) throws SQLException {
+
+        Connection connection = DBConnectorFATDB.dbConnector();
+
+        int besteld = 0;
+        int gelerved = 0;
+
+
+        String sql = "select \n" +
+                "b2.BESTELD  as BESTELD_bestelling\n" +
+                ", b2.GELEVERD  as GELEVERD_bestelling\n" +
+                "from storenotesdetail s \n" +
+                "join bestellingdetail b2 \n" +
+                "\ton s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "                where s.STATUSCODE  = 'O'\n" +
+                "                and s.AFDELINGSEQ  = ? \n" +
+                "                and s.artikelcode  = ? \n" +
+                "                and s.BESTELD  <> s.GELEVERD \n" +
+                "                and b2.BESTELDATUM  = ? \n" +
+                "                order by b2.BESTELDATUM  \n" +
+                "                desc";
+
+        PreparedStatement pstmnt = connection.prepareStatement(sql);
+        pstmnt.setString(1,MachineNumber);
+        pstmnt.setString(2,art.getARTIKELCODE_storenotes());
+        pstmnt.setString(3,art.getBESTELDATUM_bestelling());
+
+
+        ResultSet rs = pstmnt.executeQuery();
+
+
+        if (rs.next() == false) {
+            System.out.println("ResultSet is Empty for checkIfArticlehasBesteldDifferentThanGelerved");
+        } else {
+            do {
+                besteld = rs.getInt("BESTELD");
+                gelerved = rs.getInt("GELEVERD");
+            } while (rs.next());
+        }
+
+
+        rs.close();;
+        pstmnt.close();
+
+        return besteld != gelerved ? true : false;
+    }
+
+    private static StorenoteBestellingdetails_Stock processListOfChildArticles(String leverancier_bestelling, String ordernummer_bestelling, String artikelcode_storenotes, String mapOfpotentialCHildArticles) throws SQLException {
+
+        Connection connection = DBConnectorFATDB.dbConnector();
+
+
+        // should calling for function -> change it later while refactoring
+        String sql = "select \n" +
+                "  s.Leverancier as Leverancier_storenotes\n" +
+                ", s.ORDERNUMMER  as ORDERNUMMER_storenotes\n" +
+                ", s.ARTIKELCODE  as ARTIKELCODE_storenotes\n" +
+                ", s.ARTIKELOMSCHRIJVING as ARTIKELOMSCHRIJVING_storenotes\n" +
+                ", s.BESTELD as BESTELD_storenotes\n" +
+                ", s.GELEVERD  as GELEVERD_storenotes\n" +
+                ", s.CFSTOCK as CFSTOCK_storenotes\n" +
+                ", s.AFDELING as AFDELING_storenotes\n" +
+                ", s.AFDELINGSEQ as AFDELINGSEQ_storenotes\n" +
+                ", s.MONTAGE as MONTAGE_storenotes\n" +
+                ", s.BESTELDATUM as BESTELDATUM_storentoes\n" +
+                ", b2.leverancier as leverancier_bestelling\n" +
+                ", b2.ORDERNUMMER  as ORDERNUMMER_bestelling\n" +
+                ", b2.BESTELDATUM  as BESTELDATUM_bestelling\n" +
+                ", b2.AFDELINGSEQ  as afdelingseq_bestelling\n" +
+                ", st.Ilosc  as ilosc_stock\n" +
+                ", st.naProdukcji  as naProdukcji_stock\n" +
+                ", st.Zapotrzebowanie  as Zapotrzebowanie_stock\n" +
+                "from storenotesdetail s \n" +
+                "join bestellingdetail b2 \n" +
+                "\ton s.ARTIKELCODE  = b2.ARTIKELCODE \n" +
+                "left join stock st\n" +
+                "     on s.ARTIKELCODE  = st.kodArtykulu \n" +
+                "       where b2.ARTIKELCODE  = ? \n" +
+                "                and s.AFDELING  = ? \n" +
+                "                and s.AFDELINGSEQ = ? \n" +
+                "                and s.STATUSCODE  ='O'\n";
+
+        PreparedStatement pstmnt = connection.prepareStatement(sql);
+
+        pstmnt.setString(1,mapOfpotentialCHildArticles); // articelcode
+        pstmnt.setString(2,leverancier_bestelling);  // afdeling
+        pstmnt.setString(3,ordernummer_bestelling);  // afdelingseq
+
+
+        ResultSet rs = pstmnt.executeQuery();
+
+        StorenoteBestellingdetails_Stock art = null;
+
+            if (rs.next() == false) {
+            System.out.println("ResultSet is empty for processListOfChildArticles");
+                return art;
+        } else {
+            do {
+                art = new StorenoteBestellingdetails_Stock(
+                        rs.getString("Leverancier_storenotes"),
+                        rs.getString("ORDERNUMMER_storenotes"),
+                        rs.getString("ARTIKELCODE_storenotes"),
+                        rs.getString("ARTIKELOMSCHRIJVING_storenotes"),
+                        rs.getString("BESTELD_storenotes"),
+                        rs.getString("GELEVERD_storenotes"),
+                        rs.getString("CFSTOCK_storenotes"),
+                        rs.getString("AFDELING_storenotes"),
+                        rs.getString("AFDELINGSEQ_storenotes"),
+                        rs.getString("MONTAGE_storenotes"),
+                        rs.getString("BESTELDATUM_storentoes"),
+                        rs.getString("leverancier_bestelling"),
+                        rs.getString("ORDERNUMMER_bestelling"),
+                        rs.getString("BESTELDATUM_bestelling"),
+                        rs.getString("afdelingseq_bestelling"),
+                        rs.getString("ilosc_stock"),
+                        rs.getString("naProdukcji_stock"),
+                        rs.getString("Zapotrzebowanie_stock")
+                );
+
+            } while (rs.next());
+        }
+
+
+
+        return art;
+
+    }
+
+    private static Map<String, String> checkForChildArticleFromGttDatabase(String leverancier_bestelling, String ordernummer_bestelling, String artikelcode_storenotes, String machineNumber) throws SQLException {
+
+
+        Map<String, String> childArticleType = new HashMap<>();
+
+        Connection connection_Gtt = DBConnectorGtt.dbConnector();
+
+
+        // temporary, should be changed to PreparedStatement values
+        String sql = "select CHILDARTICLE , `TYPE`  from machine_structure_details msd \n" +
+                "where PARENTARTICLE = '"+artikelcode_storenotes+"'\n" +
+                "and MACHINENUMBER  = '"+machineNumber+"'";
+
+
+        PreparedStatement pstmnt = connection_Gtt.prepareStatement(sql);
+        ResultSet rs=pstmnt.executeQuery();
+
+        if (rs.next() == false) {
+            System.out.println("RsultSet is empty for checkForChildArticleFromGttDatabase");
+        } else {
+            do {
+                childArticleType.put(
+                        rs.getString("CHILDARTICLE"),
+                        rs.getString("TYPE")
+                                     );
+
+            } while (rs.next());
+        }
+
+
+        return childArticleType;
+
     }
 
     private static String filterOverBestellingDetailOnceAgain(String artikelcode_storenotes, Connection connection_fatdb) throws SQLException {
@@ -428,8 +724,6 @@ public class main {
 
 
         ResultSet rs=pstmnt.executeQuery();
-        
-        getRowcCOunt(rs);
 
         StorenoteBestellingdetails_Stock art = null;
         while(rs.next())
@@ -501,12 +795,6 @@ public class main {
 
 
         return count_resultSet;
-    }
-
-    private static void getRowcCOunt(ResultSet resultSet) {
-
-
-
     }
 
     private static void FindArticleStock(LeverancierOrdernummer leverancierOrder) throws SQLException {
